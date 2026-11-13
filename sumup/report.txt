@@ -1,0 +1,9 @@
+Products in master sheet: 516
+Photos downloaded from Ragic this run: 116
+
+SumUp import file: sumup/sumup_import.csv
+  WARNING: no sumup_export.csv uploaded - every row will be created as a NEW item.
+  Export your catalogue from SumUp and upload it here as sumup_export.csv first.
+
+Problems (0):
+  none
