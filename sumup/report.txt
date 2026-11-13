@@ -2,8 +2,39 @@ Products in master sheet: 516
 Photos downloaded from Ragic this run: 0
 
 SumUp import file: sumup/sumup_import.csv
-  WARNING: no sumup_export.csv uploaded - every row will be created as a NEW item.
-  Export your catalogue from SumUp and upload it here as sumup_export.csv first.
+  Will UPDATE existing SumUp items: 400
+  Will CREATE new SumUp items:      116
+
+In SumUp but no longer in the master sheet (29) - delete these by hand in SumUp:
+  BI-001  HAIR ACCESSORY
+  BI-002  HAIR ACCESSORY
+  BI-003  HAIR ACCESSORY
+  BI-004  HAIR ACCESSORY
+  BI-005  HAIR ACCESSORY
+  BI-006  HAIR ACCESSORY
+  BI-007  HAIR ACCESSORY
+  BI-008  HAIR ACCESSORY
+  BI-009  HAIR ACCESSORY
+  BI-010  HAIR ACCESSORY
+  BI-011  HAIR ACCESSORY
+  BI-012  HAIR ACCESSORY
+  BI-013  HAIR ACCESSORY
+  BI-014  HAIR ACCESSORY
+  BI-015  HAIR ACCESSORY
+  BI-016  HAIR ACCESSORY
+  BI-017  HAIR ACCESSORY
+  BI-018  HAIR ACCESSORY
+  BI-019  HAIR ACCESSORY
+  BI-020  HAIR ACCESSORY
+  BI-021  HAIR ACCESSORY
+  BI-022  HAIR ACCESSORY
+  BI-023  HAIR ACCESSORY
+  BI-024  HAIR ACCESSORY
+  BI-025  HAIR ACCESSORY
+  BI-026  HAIR ACCESSORY
+  BI-027  HAIR ACCESSORY
+  BI-028  HAIR ACCESSORY
+  BI-029  HAIR ACCESSORY
 
 Problems (0):
   none
