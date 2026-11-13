@@ -1,5 +1,5 @@
 Products in master sheet: 516
-Photos downloaded from Ragic this run: 116
+Photos downloaded from Ragic this run: 0
 
 SumUp import file: sumup/sumup_import.csv
   WARNING: no sumup_export.csv uploaded - every row will be created as a NEW item.
