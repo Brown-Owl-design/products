@@ -1,0 +1,44 @@
+name: Update products
+
+# Runs whenever products.csv or sumup_export.csv is uploaded, or by hand from the Actions tab.
+on:
+  push:
+    branches: [main]
+    paths:
+      - products.csv
+      - sumup_export.csv
+      - scripts/build.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-products
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download photos and build SumUp file
+        run: python scripts/build.py
+
+      - name: Save results to the repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing changed."
+          else
+            git commit -m "Update photos and SumUp import file"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
