@@ -15,7 +15,7 @@ Outputs:
   sumup/sumup_import.csv   file to import into SumUp (Items -> Import)
   sumup/report.txt         summary: new items, updated items, items to delete in SumUp, problems
 """
-import csv, os, re, sys, time, urllib.parse, urllib.request
+import csv, html, os, re, sys, time, urllib.parse, urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO = os.environ.get("GITHUB_REPOSITORY", "brown-owl-design/products")
@@ -175,21 +175,72 @@ def main():
             "Display service in Bookings? (Yes/No)": "No",
         })
 
-    # match SumUp's existing items by SKU so they are updated, not duplicated
+    # Link products to SumUp's existing items so they are updated, not duplicated.
+    # SumUp's export does not keep our SKUs, so sumup_ids.csv remembers which SumUp
+    # item belongs to which product. Items SumUp created last time are recognised by
+    # matching their details against the previous sumup_import.csv.
+    ids = {}
+    for r in (read_csv("sumup_ids.csv") or [])[1:]:
+        if len(r) >= 4:
+            ids[r[0]] = {"item": r[1], "variant": r[2], "filename": r[3]}
     export = read_csv("sumup_export.csv")
-    sumup_ids, to_delete = {}, []
+    to_delete, unknown, sumup_img = [], [], {}
+    current = {p["SKU"]: p for p in products}
     if export:
         eh = export[0]
-        si, ii = eh.index("SKU"), eh.index("Item id (Do not change)")
-        ni = eh.index("Item name")
-        for r in export[1:]:
-            if len(r) > max(si, ii) and r[si].strip():
-                sumup_ids[r[si].strip()] = r[ii].strip()
-        skus = {p["SKU"] for p in products}
-        to_delete = [f"{r[si]}  {r[ni]}" for r in export[1:]
-                     if len(r) > si and r[si].strip().startswith("BI-") and r[si].strip() not in skus]
+        E = [dict(zip(eh, r + [""] * (len(eh) - len(r)))) for r in export[1:]]
+        key = lambda x: tuple(html.unescape(clean(x.get(f, ""))) for f in (
+            "Item name", "Description (Online Store and Invoices only)", "Category", "Price"))
+        live = {e["Item id (Do not change)"] for e in E}
+        ids = {k: v for k, v in ids.items() if v["item"] in live}   # forget items deleted in SumUp
+        known = {v["item"] for v in ids.values()}
+        by_item = {e["Item id (Do not change)"]: e for e in E}
+        for e in E:   # SKU kept by SumUp
+            sku = clean(e.get("SKU", ""))
+            if sku.startswith("BI-") and e["Item id (Do not change)"] not in known and sku not in ids:
+                ids[sku] = {"item": e["Item id (Do not change)"], "variant": e.get("Variant id (Do not change)", ""), "filename": ""}
+                known.add(e["Item id (Do not change)"])
+        prev_rows = []
+        pm = read_csv("sumup/sumup_import.csv") or []
+        if pm:
+            prev_rows = [dict(zip(pm[0], r)) for r in pm[1:]]
+        pool = {}
+        for pr in prev_rows:
+            if pr.get("SKU") and pr["SKU"] not in ids:
+                pool.setdefault(key(pr), []).append(pr)
+        for e in E:
+            iid = e["Item id (Do not change)"]
+            if iid in known:
+                continue
+            cands = pool.get(key(e))
+            if cands:
+                pr = cands.pop(0)
+                fn = urllib.parse.unquote(pr.get("Image 1", "").rsplit("/", 1)[-1])
+                ids[pr["SKU"]] = {"item": iid, "variant": e.get("Variant id (Do not change)", ""), "filename": fn}
+                known.add(iid)
+            else:
+                unknown.append(f"{e['Item name']}  (SumUp item {iid})")
+        for sku, v in ids.items():
+            if sku not in current and v["item"] in by_item:
+                to_delete.append(f"{sku}  {by_item[v['item']]['Item name']}")
+            if v["item"] in by_item:
+                sumup_img[sku] = by_item[v["item"]].get("Image 1", "")
     for p in products:
-        p["Item id (Do not change)"] = sumup_ids.get(p["SKU"], "")
+        v = ids.get(p["SKU"])
+        if v and p["SKU"] in current:
+            p["Item id (Do not change)"] = v["item"]
+            p["Variant id (Do not change)"] = v["variant"]
+            fn = urllib.parse.unquote(p["Image 1"].rsplit("/", 1)[-1]) if p["Image 1"] else ""
+            if fn and fn == v["filename"] and sumup_img.get(p["SKU"]):
+                p["Image 1"] = sumup_img[p["SKU"]]   # photo unchanged: keep SumUp's copy
+            else:
+                v["filename"] = fn
+
+    with open(os.path.join(ROOT, "sumup_ids.csv"), "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["sku", "sumup_item_id", "sumup_variant_id", "photo_filename"])
+        for sku in sorted(ids):
+            w.writerow([sku, ids[sku]["item"], ids[sku]["variant"], ids[sku]["filename"]])
 
     os.makedirs(os.path.join(ROOT, "sumup"), exist_ok=True)
     with open(os.path.join(ROOT, "sumup", "sumup_import.csv"), "w", newline="", encoding="utf-8") as f:
@@ -203,18 +254,20 @@ def main():
         for rec in sorted(imap, key=lambda x: int(x) if x.isdigit() else 0):
             w.writerow([rec, imap[rec]["filename"], imap[rec]["source_url"]])
 
-    new = sum(1 for p in products if not p["Item id (Do not change)"])
+    new = sum(1 for p in products if not p.get("Item id (Do not change)"))
     lines = [
         f"Products in master sheet: {len(products)}",
         f"Photos downloaded from Ragic this run: {len(downloaded)}",
         "",
         "SumUp import file: sumup/sumup_import.csv",
     ]
-    if export:
+    if export or ids:
         lines += [f"  Will UPDATE existing SumUp items: {len(products) - new}",
                   f"  Will CREATE new SumUp items:      {new}",
                   "", f"In SumUp but no longer in the master sheet ({len(to_delete)}) - delete these by hand in SumUp:"]
         lines += ["  " + x for x in to_delete] or ["  none"]
+        if unknown:
+            lines += ["", f"In SumUp but not recognised ({len(unknown)}) - check these by hand:"] + ["  " + x for x in unknown]
     else:
         lines += ["  WARNING: no sumup_export.csv uploaded - every row will be created as a NEW item.",
                   "  Export your catalogue from SumUp and upload it here as sumup_export.csv first."]
